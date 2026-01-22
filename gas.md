@@ -5,20 +5,20 @@ Ethereum gas fees are computed from three core variables: gas used, base fee, an
 For an EIP-1559-style chain like Ethereum mainnet, the canonical formula is:
 
 - Effective gas price (in gwei or wei):  
-  \(\text{effectiveGasPrice} = \text{baseFeePerGas} + \text{priorityFeePerGas}\) 
+  {effectiveGasPrice} = {baseFeePerGas} + {priorityFeePerGas} 
 - Total fee paid (in ETH):  
-  \(\text{totalFee} = \text{gasUsed} \times \text{effectiveGasPrice}\) 
+  {totalFee} = {gasUsed} * {effectiveGasPrice} 
 
 In practice UIs often show:
 
-- \(\text{maxFeePerGas}\): user’s max total price per gas  
-- \(\text{maxPriorityFeePerGas}\): user’s max tip  
-- On-chain effective gas price is \(\min(\text{maxFeePerGas}, \text{baseFeePerGas} + \text{maxPriorityFeePerGas})\). 
+- {maxFeePerGas}: user’s max total price per gas  
+- {maxPriorityFeePerGas}: user’s max tip  
+- On-chain effective gas price is {maxFeePerGas}, {baseFeePerGas} + {maxPriorityFeePerGas}. 
 
 So a more explicit formula is:
 
-- \(\text{effectiveGasPrice} = \min(\text{maxFeePerGas}, \text{baseFeePerGas} + \text{maxPriorityFeePerGas})\) 
-- \(\text{totalFee} = \text{gasUsed} \times \text{effectiveGasPrice}\) 
+- {effectiveGasPrice} = {maxFeePerGas}, {baseFeePerGas} + {maxPriorityFeePerGas}
+- {totalFee} = {gasUsed} * {effectiveGasPrice} 
 When people say “gas fee = gas price × gas limit”, they are implicitly assuming gasUsed ≈ gasLimit for the estimate. 
 ## Gas limit vs gas used vs gas price
 
@@ -73,7 +73,7 @@ Beyond gas limit and price, several factors affect what you actually pay:
 
 - **Protocol-specific overhead**  
   - For account abstraction (ERC-4337), fee formula adds components like preVerificationGas, verificationGas, and callGas.
-  - Actual fee is \(\text{gasFee} \times (\text{preVerificationGas} + \text{meteredVerificationGas} + \text{meteredCallGas})\). 
+  - Actual fee is {gasFee} * {preVerificationGas} + {meteredVerificationGas} + {meteredCallGas}. 
 
 ## Example real-time gas estimation function
 
@@ -83,42 +83,6 @@ At a high level, a real-time estimator needs:
 - Recommended priority fees by speed tier (safe / standard / fast) from recent blocks  
 - A good gasUsed estimate per tx type (via eth_estimateGas or historical profiling) 
 Pseudocode for an Ethereum-like chain (JavaScript-style):
-
-```ts
-type SpeedTier = "slow" | "standard" | "fast";
-
-interface GasMarketSample {
-  baseFeePerGas: bigint;          // from latest block
-  suggestedPriority: {
-    slow: bigint;
-    standard: bigint;
-    fast: bigint;
-  };                              // derived from recent txs
-}
-
-interface TxProfile {
-  targetGasUsed: bigint;          // estimated gasUsed from eth_estimateGas or historical
-  safetyMarginBps: number;        // e.g. 11000 for +10%
-}
-
-function estimateGasParams(
-  market: GasMarketSample,
-  profile: TxProfile,
-  speed: SpeedTier,
-  maxFeeMultiplierBps: number = 20000 // cap maxFee at 2x(base+priority) by default
-) {
-  const base = market.baseFeePerGas;                         // wei
-  const tip = market.suggestedPriority[speed];               // wei
-
-  const effective = base + tip;                              // wei
-  const maxFeePerGas = (effective * BigInt(maxFeeMultiplierBps)) / 10_000n;
-
-  const gasLimit = (profile.targetGasUsed * BigInt(profile.safetyMarginBps)) / 10_000n;
-
-  const totalFeeWei = gasLimit * effective;                  // worst-case fee
-  return { baseFeePerGas: base, maxPriorityFeePerGas: tip, maxFeePerGas, gasLimit, totalFeeWei };
-}
-```
 
 - `targetGasUsed` should be obtained by calling `eth_estimateGas` with the intended transaction data, possibly averaged or padded by historical executions of the same function signature. 
 - `suggestedPriority` can be produced by scanning the last N blocks and computing median tips for transactions by inclusion latency. 
